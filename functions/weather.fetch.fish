@@ -9,11 +9,16 @@ function weather.fetch -d "Fetches data from a URL backed by a cache"
   end
 
   if not find /tmp/$md5.url -mmin +$cache_age > /dev/null 2> /dev/null
-    curl -Gs $flags $argv[1] > /tmp/$md5.url
+
+  set cache_root (set --query XDG_CACHE_HOME; and echo $XDG_CACHE_HOME; or echo /tmp)/omf/plugins/weather
+  mkdir -p $cache_root
+  set tmp_file $cache_root/$md5.url
+
+    curl -LGs $flags $argv[1] > $tmp_file
       or return 1
   end
 
-  cat /tmp/$md5.url
+  cat $tmp_file
 end
 
 function __md5
