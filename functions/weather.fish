@@ -31,7 +31,9 @@ function weather -d "Displays weather info"
     set location (weather.location)
 
     # Fetch weather data based on the location.
-    if not set json (weather.fetch "http://api.openweathermap.org/data/2.5/weather" lat=$location[1] lon=$location[2] APPID=$api_key)
+    if not set json (weather.fetch "https://api.open-meteo.com/v1/forecast" \
+        current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m,wind_gusts_10m,wind_direction_10m \
+        latitude=$location[1] longitude=$location[2] temperature_unit=celsius)
       echo "Unable to fetch weather data; please try again later."
       return 1
     end
@@ -47,10 +49,10 @@ function weather -d "Displays weather info"
 
   printf "Weather for $location[3], $location[4]\n\n"
 
-  set temp (echo $json | jq '.main.temp')
-  set wind_speed (echo $json | jq '.wind.speed')
-  set wind_gust (echo $json | jq '.wind.gust')
-  set wind_deg (echo $json | jq '.wind.deg')
+  set temp (echo $json | jq '.current.temperature_2m')
+  set wind_speed (echo $json | jq '.current.wind_speed_10m')
+  set wind_gust (echo $json | jq '.current.wind_gusts_10m')
+  set wind_deg (echo $json | jq '.current.wind_direction_10m')
 
   # convert m/s to km/h
   set wind_speed_kmh ( math -s 1 $wind_speed \* 3.6 )
@@ -72,9 +74,9 @@ function weather -d "Displays weather info"
 
   # Display forecast summary
   echo "Temperature: "(__weather_print_temperature $temp)
-  echo "   Humidity: "(echo $json | jq '.main.humidity')"%"
-  echo " Cloudiness: "(echo $json | jq -r '.weather[0].description')
-  echo "   Pressure: "(echo $json | jq '.main.pressure')" hpa"
+  echo "   Humidity: "(echo $json | jq '.current.relative_humidity_2m')"%"
+  echo " Cloudiness: "(__weather_code (echo $json | jq '.current.weather_code'))
+  echo "   Pressure: "(echo $json | jq '.current.surface_pressure')" hPa"
   echo -n "       Wind: from $wind_dir ($wind_deg°) at $wind_speed m/s ($wind_speed_kmh km/h)"
   if not test $wind_gust = null
     echo " gusting to $wind_gust m/s ($wind_gust_kmh km/h)"
@@ -92,16 +94,16 @@ end
 # Arguments:
 #   1: The temperature to display in Kelvin.
 function __weather_print_temperature
-  set kelvin $argv[1]
+  set celsius $argv[1]
 
   set -l temperature_units (config weather --get temperature-units)
+
+  set kelvin (math "$celsius + 273.15")
 
   if test "$temperature_units" = "kelvin"
     echo "$kelvin K"
     return 0
   end
-
-  set celsius (math "$kelvin - 273.15")
 
   if test $temperature_units = "celsius"
     echo "$celsius °C"
@@ -115,4 +117,39 @@ function __weather_print_temperature
   else
     echo "$celsius °C ($fahrenheit °F)"
   end
+end
+
+function __weather_code
+    set code $argv[1]
+
+    switch $code
+        case 0
+            echo "Clear sky"
+        case 1 2 3
+            echo "Mainly clear, partly cloudy, and overcast"
+        case 45 48
+            echo "Fog and depositing rime fog"
+        case 51 53 55
+            echo "Drizzle: Light, moderate, and dense intensity"
+        case 56 57
+            echo "Freezing Drizzle: Light and dense intensity"
+        case 61 63 65
+            echo "Rain: Slight, moderate, and heavy intensity"
+        case 66 67
+            echo "Freezing Rain: Light and heavy intensity"
+        case 71 73 75
+            echo "Snow fall: Slight, moderate, and heavy intensity"
+        case 77
+            echo "Snow grains"
+        case 80 81 82
+            echo "Rain showers: Slight, moderate, and violent"
+        case 85 86
+            echo "Snow showers: Slight and heavy"
+        case 95
+            echo "Thunderstorm: Slight or moderate"
+        case 96 99
+            echo "Thunderstorm with slight and heavy hail"
+        case '*'
+            echo "Unknown weather code"
+    end
 end
