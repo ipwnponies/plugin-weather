@@ -6,7 +6,7 @@ function weather.location -d "Get the current geographic location"
   end
 
   # Fetch location data based on our IP
-  if not set geoip_data (weather.fetch "https://ipapi.com/ip_api.php?ip=$ip")
+  if not set geoip_data (weather.fetch "https://freeip2geo.net/api")
     echo "Unable to query GeoIP data; please try again later."
     return 1
   end
